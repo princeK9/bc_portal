@@ -1,0 +1,19 @@
+# .gitignore
+venv/
+__pycache__/
+*.pyc
+.env
+uploads/
+data/
+
+.env
+__pycache__/
+
+credentials.txt
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.env.*
