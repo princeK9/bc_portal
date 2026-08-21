@@ -1,6 +1,6 @@
 # BlueHire Portal — Talent Discovery Engine for Blue-Collar Hiring
 
-![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
+![Python 3.12](https://img.shields.io/badge/python-3.12-blue) ![FastAPI 0.139.0](https://img.shields.io/badge/FastAPI-0.139.0-009688) ![Celery 5.6.3](https://img.shields.io/badge/Celery-5.6.3-37814A) ![Redis 7](https://img.shields.io/badge/Redis-7-DC382D) ![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-336791) ![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED)
 
 Resumes (PDF, DOCX, image, or plain text) are parsed by Gemini into a structured
 candidate profile, embedded with a local sentence-transformer model, and stored
