@@ -1,0 +1,67 @@
+# Test override: adds a throwaway Postgres and points the stack at it.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml up --build
+#
+# Exists so the live end-to-end run does not touch the production Supabase
+# instance. The production table currently holds rows that would violate the
+# phone uniqueness rule (placeholder 555-555-5555 numbers on five rows), and
+# deleting live data to make a test pass is not an acceptable trade.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    # Docker's default /dev/shm is 64MB. A parallel HNSW index build allocates a
+    # shared memory segment far larger than that and dies with
+    # "could not resize shared memory segment ... No space left on device".
+    # Observed directly while building the index on 99,387 rows.
+    shm_size: 1gb
+    environment:
+      POSTGRES_USER: bc_portal
+      POSTGRES_PASSWORD: bc_portal_test
+      POSTGRES_DB: bc_portal
+    volumes:
+      # Both run at first init, in filename order: base schema, then migration.
+      - ./migrations/000_schema.sql:/docker-entrypoint-initdb.d/000_schema.sql:ro
+      - ./migrations/001_phone_dedup.sql:/docker-entrypoint-initdb.d/001_phone_dedup.sql:ro
+      - ./migrations/002_hnsw_index.sql:/docker-entrypoint-initdb.d/002_hnsw_index.sql:ro
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bc_portal -d bc_portal"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    environment:
+      # TEST-ONLY. Production default is 900s (see config.py). Shortened here so
+      # a killed worker's stranded tasks are observably redelivered inside a
+      # test run rather than an hour later. Do not copy this value to prod: it
+      # is below the 720s maximum retry backoff, so a long-backoff retry would
+      # be redelivered while still legitimately in flight.
+      BROKER_VISIBILITY_TIMEOUT: "60"
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: bc_portal
+      DB_USER: bc_portal
+      DB_PASSWORD: bc_portal_test
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    environment:
+      # TEST-ONLY -- see the note on the api service above.
+      BROKER_VISIBILITY_TIMEOUT: "60"
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: bc_portal
+      DB_USER: bc_portal
+      DB_PASSWORD: bc_portal_test
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy

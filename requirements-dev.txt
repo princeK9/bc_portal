@@ -1,0 +1,9 @@
+# Development and CI only. Runtime dependencies live in requirements.txt.
+-r requirements.txt
+
+pytest==9.1.1
+pyflakes==3.4.0
+
+# Browser-driven verification of the UI. Needs `playwright install chromium`
+# after pip install; the browser binary is not a Python package.
+playwright==1.62.0

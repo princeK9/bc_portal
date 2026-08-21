@@ -1,19 +1,33 @@
-# .gitignore
-venv/
-__pycache__/
-*.pyc
-.env
-uploads/
-data/
-
-.env
-__pycache__/
-
-credentials.txt
-
+# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
+.pytest_cache/
+
+# Secrets. .env.example is the committed template and must stay trackable,
+# so the negation below re-includes it after the .env.* sweep.
 .env
 .env.*
+!.env.example
+# Retained after the file was removed: if anyone recreates the old
+# plaintext credentials file out of habit, it stays untrackable.
+credentials.txt
+
+# Runtime working directories (created on demand by scripts/pipeline.py)
+uploads/
+data/
+
+# Local sample corpus: large/regenerable files, not meant to ship in the repo.
+# Tests that need them (tests/conftest.py, tests/test_integration.py) skip
+# cleanly with a stated reason when they're absent rather than erroring.
+sample_data/*.jsonl
+sample_data/sample_resumes.zip
+sample_data/resumes/
+
+# Celery / spool
+spool/
+celerybeat-schedule
+
+# Working engineering log. Kept locally; not part of the shipped repo.
+notes.md

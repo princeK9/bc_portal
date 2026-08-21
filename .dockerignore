@@ -1,0 +1,13 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.git/
+.pytest_cache/
+spool/
+sample_data/bulk_seed.jsonl
+data/
+uploads/
+tests/
+notes.md
+README.md

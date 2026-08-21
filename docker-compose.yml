@@ -1,0 +1,77 @@
+services:
+  redis:
+    image: redis:7-alpine
+    # appendonly keeps queued tasks across a restart. Without it a redis
+    # restart silently empties the queue and every in-flight upload vanishes.
+    command: >
+      redis-server
+      --appendonly yes
+      --save 60 1
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    env_file: .env
+    environment:
+      # Service name, not localhost -- inside the network each container has
+      # its own loopback. db 0 is the broker, db 1 the disposable search cache.
+      REDIS_URL: redis://redis:6379/0
+      REDIS_CACHE_URL: redis://redis:6379/1
+      SPOOL_DIR: /app/spool
+    ports:
+      - "8000:8000"
+    volumes:
+      # Shared with the worker. The API unpacks uploads here and the worker
+      # reads them; without a shared volume every task fails on a missing path.
+      - spool_data:/app/spool
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  worker:
+    build: .
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      REDIS_CACHE_URL: redis://redis:6379/1
+      SPOOL_DIR: /app/spool
+    volumes:
+      - spool_data:/app/spool
+    depends_on:
+      redis:
+        condition: service_healthy
+    # Concurrency is read from WORKER_CONCURRENCY in .env; see the derivation
+    # in celery_app.py. Passed explicitly so `docker compose up --scale` and the
+    # env var cannot disagree.
+    command: >
+      celery -A celery_app worker
+      --loglevel=INFO
+      --concurrency=${WORKER_CONCURRENCY:-4}
+      --hostname=worker@%h
+    healthcheck:
+      # Node name must match --hostname above (worker@%h), not Celery's default
+      # celery@%h -- pinging the wrong node name never matches and leaves the
+      # container permanently unhealthy.
+      test: ["CMD", "celery", "-A", "celery_app", "inspect", "ping", "-d", "worker@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+volumes:
+  redis_data:
+  spool_data:

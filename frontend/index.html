@@ -76,6 +76,37 @@
         .Low-Match { background: #fee2e2; color: #991b1b; }
         .raw-sim { font-size: 11px; color: #94a3b8; margin-top: 8px; }
         .loading { display: none; color: #6b7280; font-weight: 500; padding: 20px 0; }
+
+        /* --- INGESTION PAGE STYLES --- */
+        .drop-zone { background: var(--card-bg); border: 2px dashed #cbd5e1; border-radius: 10px; padding: 45px; text-align: center; color: #64748b; transition: 0.2s; }
+        .drop-zone.dragover { border-color: var(--primary); background: #eff6ff; }
+        .drop-zone h3 { margin: 0 0 10px 0; color: #334155; }
+        .file-name { margin-top: 15px; font-weight: 600; color: var(--primary); }
+        .upload-btn { background-color: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 20px; transition: 0.2s; }
+        .upload-btn:hover:not(:disabled) { background-color: var(--primary-hover); }
+        .upload-btn:disabled { background-color: #94a3b8; cursor: not-allowed; }
+
+        #progressPanel { display: none; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 25px; margin-top: 25px; }
+        .batch-id { font-family: 'Consolas', monospace; font-size: 12px; color: #64748b; margin-bottom: 18px; word-break: break-all; }
+        .counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+        .count-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 15px; text-align: center; }
+        .count-val { font-size: 26px; font-weight: 800; line-height: 1; }
+        .count-label { font-size: 12px; color: #64748b; margin-top: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .c-done { color: #16a34a; } .c-failed { color: #dc2626; } .c-pending { color: #d97706; } .c-total { color: var(--primary); }
+
+        .progress-track { background: #e2e8f0; border-radius: 999px; height: 12px; overflow: hidden; margin-bottom: 8px; }
+        .progress-fill { background: linear-gradient(90deg, #3b82f6, #16a34a); height: 100%; width: 0%; transition: width 0.4s ease; }
+        .progress-caption { font-size: 13px; color: #64748b; margin-bottom: 20px; }
+
+        .file-list { max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+        .file-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 14px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+        .file-row:last-child { border-bottom: none; }
+        .file-row .fname { color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 12px; }
+        .pill { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+        .pill.done { background: #dcfce7; color: #166534; }
+        .pill.failed { background: #fee2e2; color: #991b1b; }
+        .pill.pending { background: #fef3c7; color: #92400e; }
+        .upload-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; border-radius: 8px; padding: 14px; margin-top: 18px; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -84,7 +115,7 @@
         <div class="logo">blue<span>HIRE</span></div>
         <div class="nav-item active" onclick="switchTab('home')" id="nav-home">🏠 Executive Summary</div>
         <div class="nav-item" onclick="switchTab('search')" id="nav-search">🔍 Talent Search</div>
-        <div class="nav-item" onclick="switchTab('ingestion')" id="nav-ingestion">📁 Bulk Ingestion (Soon)</div>
+        <div class="nav-item" onclick="switchTab('ingestion')" id="nav-ingestion">📁 Bulk Ingestion</div>
         <div class="sidebar-footer">v1.0.0 Enterprise Access</div>
     </div>
 
@@ -111,12 +142,12 @@
                 <div class="dash-card">
                     <div class="dash-icon">⚡</div>
                     <h3>Bulk AI Parsing</h3>
-                    <p>Upload thousands of unstructured resumes at once in ZIP format. Our ephemeral processing pipeline reads, extracts, and vectorizes candidate data in temporary memory for high-speed, zero-storage ingestion.</p>
+                    <p>Upload thousands of unstructured resumes at once in ZIP format. Each file is unpacked to temporary working storage, extracted, vectorized, and then deleted immediately once processing finishes — successfully or not. Only the structured candidate record is kept; the original resume is never retained.</p>
                 </div>
                 <div class="dash-card">
                     <div class="dash-icon">⚙️</div>
                     <h3>System Architecture</h3>
-                    <p>Powered by Google Gemini 3.5 Flash for data extraction, all-MiniLM-L6-v2 for 384-dimensional vector embeddings, and Supabase pgvector for sub-millisecond similarity search.</p>
+                    <p>Powered by Google Gemini 3.5 Flash Lite for data extraction, all-MiniLM-L6-v2 for 384-dimensional vector embeddings, and Supabase pgvector for sub-millisecond similarity search.</p>
                 </div>
             </div>
 
@@ -158,10 +189,32 @@
                 <h1>Bulk Ingestion Engine</h1>
                 <p>Drop ZIP archives of resumes here for automated AI processing.</p>
             </div>
-            <div style="background: var(--card-bg); border: 2px dashed #cbd5e1; border-radius: 10px; padding: 60px; text-align: center; color: #64748b;">
+            <div class="drop-zone" id="dropZone">
                 <div style="font-size: 40px; margin-bottom: 15px;">📥</div>
-                <h3 style="margin: 0 0 10px 0; color: #334155;">Pipeline Under Construction</h3>
-                <p>This module will handle automated memory-level ZIP extraction and vectorization.</p>
+                <h3>Drop a ZIP archive here, or choose a file</h3>
+                <p>Each resume is dispatched as its own background task. Extraction calls Gemini,
+                   so a large archive takes minutes rather than seconds — progress updates live below.</p>
+                <input type="file" id="zipInput" accept=".zip,application/zip" style="margin-top: 15px;">
+                <div class="file-name" id="fileName"></div>
+                <button class="upload-btn" id="uploadBtn" onclick="startUpload()" disabled>Upload &amp; Process</button>
+            </div>
+
+            <div id="uploadError"></div>
+
+            <div id="progressPanel">
+                <div class="batch-id">Batch <span id="batchId">—</span></div>
+
+                <div class="counts">
+                    <div class="count-box"><div class="count-val c-total" id="cTotal">0</div><div class="count-label">Total</div></div>
+                    <div class="count-box"><div class="count-val c-done" id="cDone">0</div><div class="count-label">Done</div></div>
+                    <div class="count-box"><div class="count-val c-failed" id="cFailed">0</div><div class="count-label">Failed</div></div>
+                    <div class="count-box"><div class="count-val c-pending" id="cPending">0</div><div class="count-label">Pending</div></div>
+                </div>
+
+                <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-caption" id="progressCaption">Queued…</div>
+
+                <div class="file-list" id="fileList"></div>
             </div>
         </div>
 
@@ -181,14 +234,27 @@
         document.getElementById(`nav-${tabId}`).classList.add('active');
     }
 
+    // The query behind whatever is currently rendered in #resultsContainer.
+    // Held in state rather than re-read from the input box when a refresh is
+    // needed, because the box can hold text the user typed but never submitted
+    // -- refreshing to that would silently show results for a search they never
+    // ran. Null until the first search, which is what makes the auto-refresh a
+    // no-op on a page where nobody has searched yet.
+    let lastSearch = null;
+
     // Search Logic (With Dynamic Latency Tracking)
-    async function performSearch() {
-        const query = document.getElementById('queryInput').value;
-        const limit = document.getElementById('limitInput').value || 5; 
+    // Called with no arguments from the Search button, which reads the live
+    // inputs; called with explicit arguments by the post-batch refresh, which
+    // re-runs the last submitted query rather than the current input contents.
+    async function performSearch(queryArg, limitArg) {
+        const query = queryArg !== undefined ? queryArg : document.getElementById('queryInput').value;
+        const limit = (limitArg !== undefined ? limitArg : document.getElementById('limitInput').value) || 5;
         const resultsContainer = document.getElementById('resultsContainer');
         const loadingText = document.getElementById('loadingText');
         
         if (!query) return;
+
+        lastSearch = { query, limit };
 
         resultsContainer.innerHTML = '';
         loadingText.style.display = 'block';
@@ -197,9 +263,13 @@
             // START THE STOPWATCH
             const startTime = performance.now();
 
-            const response = await fetch(`http://127.0.0.1:8000/search?query=${encodeURIComponent(query)}&limit=${limit}`);
+            // Relative path: the API is served from this same origin, so this
+            // works unchanged whether the app runs on localhost, in Docker, or
+            // behind a domain later. The previous hardcoded
+            // http://127.0.0.1:8000 only ever worked on one machine.
+            const response = await fetch(`/search?query=${encodeURIComponent(query)}&limit=${limit}`);
             const data = await response.json();
-            
+
             // STOP THE STOPWATCH AND UPDATE UI
             const endTime = performance.now();
             const latency = Math.round(endTime - startTime);
@@ -210,8 +280,14 @@
 
             loadingText.style.display = 'none';
 
-            if (data.error) {
-                resultsContainer.innerHTML = `<div class="card" style="color: #991b1b;">Backend Error: ${data.error}</div>`;
+            // The API returns real status codes now (503 on a database outage,
+            // 500 otherwise) with FastAPI's {"detail": ...} body. This used to
+            // check data.error, which the API stopped returning when /search
+            // moved to HTTPException -- so every backend failure rendered as
+            // "no candidates found" instead of an error.
+            if (!response.ok) {
+                const detail = (data && data.detail) || `Request failed (HTTP ${response.status})`;
+                resultsContainer.innerHTML = `<div class="card" style="color: #991b1b;">Backend Error: ${detail}</div>`;
                 return;
             }
 
@@ -269,7 +345,7 @@
         
         try {
             // Ping the new FastAPI health endpoint
-            const response = await fetch('http://127.0.0.1:8000/health');
+            const response = await fetch('/health');
             
             if (response.ok) {
                 statusDot.className = 'metric-dot online';
@@ -288,6 +364,142 @@
     // Run the check immediately when the page loads
     checkServerHealth();
     setInterval(checkServerHealth, 3000);
+
+    /* ================= BULK INGESTION ================= */
+
+    // Polled rather than pushed. Extraction runs on Celery workers in a
+    // different process, so the browser has nothing to hold open; 2s is often
+    // enough to see per-file movement without hammering the API.
+    const POLL_INTERVAL_MS = 2000;
+    let pollTimer = null;
+
+    const zipInput = document.getElementById('zipInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const dropZone = document.getElementById('dropZone');
+
+    function setSelectedFile(file) {
+        if (!file) return;
+        document.getElementById('fileName').textContent =
+            `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+        uploadBtn.disabled = false;
+        window.__selectedFile = file;
+    }
+
+    zipInput.addEventListener('change', () => setSelectedFile(zipInput.files[0]));
+
+    ['dragenter', 'dragover'].forEach(ev =>
+        dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('dragover'); }));
+    ['dragleave', 'drop'].forEach(ev =>
+        dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('dragover'); }));
+    dropZone.addEventListener('drop', e => setSelectedFile(e.dataTransfer.files[0]));
+
+    function showUploadError(message) {
+        document.getElementById('uploadError').innerHTML =
+            `<div class="upload-error"><strong>Upload rejected:</strong> ${message}</div>`;
+    }
+
+    async function startUpload() {
+        const file = window.__selectedFile;
+        if (!file) return;
+
+        document.getElementById('uploadError').innerHTML = '';
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = 'Uploading…';
+
+        const form = new FormData();
+        form.append('file', file);
+
+        try {
+            const response = await fetch('/upload-resumes/', { method: 'POST', body: form });
+            const data = await response.json();
+
+            // The archive limits (file count, expanded size, compression ratio)
+            // are enforced server-side before any task is dispatched, and come
+            // back as 400 with a specific reason. Surfacing that reason matters:
+            // "too many files" and "not a zip" need different fixes.
+            if (!response.ok) {
+                showUploadError((data && data.detail) || `HTTP ${response.status}`);
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload & Process';
+                return;
+            }
+
+            uploadBtn.textContent = 'Processing…';
+            document.getElementById('progressPanel').style.display = 'block';
+            document.getElementById('batchId').textContent = data.batch_id;
+            renderProgress({
+                total: data.queued, done: 0, failed: 0, pending: data.queued,
+                progress: 0, complete: false,
+                files: data.files.map(f => ({ file: f, status: 'pending' }))
+            });
+            pollStatus(data.batch_id);
+        } catch (err) {
+            showUploadError('Could not reach the server. Is the stack running?');
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = 'Upload & Process';
+        }
+    }
+
+    function renderProgress(s) {
+        document.getElementById('cTotal').textContent = s.total;
+        document.getElementById('cDone').textContent = s.done;
+        document.getElementById('cFailed').textContent = s.failed;
+        document.getElementById('cPending').textContent = s.pending;
+
+        const pct = Math.round((s.progress || 0) * 100);
+        document.getElementById('progressFill').style.width = pct + '%';
+        document.getElementById('progressCaption').textContent = s.complete
+            ? `Complete — ${s.done} succeeded, ${s.failed} failed of ${s.total}.`
+            : `${pct}% — ${s.done + s.failed} of ${s.total} finished, ${s.pending} still processing…`;
+
+        document.getElementById('fileList').innerHTML = (s.files || []).map(f => {
+            const label = f.status === 'failed' && f.error ? `failed · ${f.error}` : f.status;
+            return `<div class="file-row">
+                        <span class="fname" title="${f.file}">${f.file}</span>
+                        <span class="pill ${f.status}">${label}</span>
+                    </div>`;
+        }).join('');
+    }
+
+    // A completed batch changes the corpus, so whatever is on screen in Talent
+    // Search now describes a database that no longer exists. The backend half of
+    // this was already solved -- the last task to finish flushes the search
+    // cache, so a re-run returns fresh rows rather than the cached ones -- but
+    // nothing told the page to ask again, so a recruiter had to re-click Search
+    // to see candidates they had just uploaded. Re-runs in place; no reload, so
+    // the progress panel and per-file list stay on screen.
+    function refreshSearchAfterBatch() {
+        if (!lastSearch) return;
+        performSearch(lastSearch.query, lastSearch.limit);
+    }
+
+    async function pollStatus(batchId) {
+        clearTimeout(pollTimer);
+        try {
+            const response = await fetch(`/status/${batchId}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                showUploadError((data && data.detail) || `HTTP ${response.status}`);
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload & Process';
+                return;
+            }
+
+            renderProgress(data);
+
+            if (data.complete) {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload & Process';
+                refreshSearchAfterBatch();
+                return;
+            }
+        } catch (err) {
+            // A transient network blip should not abandon a batch that is still
+            // running on the workers; keep polling.
+        }
+        pollTimer = setTimeout(() => pollStatus(batchId), POLL_INTERVAL_MS);
+    }
 
 </script>
 

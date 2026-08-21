@@ -1,38 +1,49 @@
-import os
-import json
-import psycopg2
-from psycopg2.extras import execute_values
+"""
+Load data/candidates.json into the candidates table.
 
-# Database connection configuration
-# Replace placeholder coordinates from supabase
-import os
-# Supabase Transaction Pooler Connection
-DB_CONFIG = {
-    "dbname": os.getenv("DB_NAME", "postgres"),
-    "user": os.getenv("DB_USER"),
-    "password": os.getenv("DB_PASSWORD"),
-    "host": os.getenv("DB_HOST"),
-    "port": os.getenv("DB_PORT", "6543"),
-}
+Run after scripts/pipeline.py has produced the JSON. Embeddings are populated
+separately by scripts/vectorize.py, so rows land here with a NULL embedding.
+"""
+
+import json
+import logging
+import sys
+from pathlib import Path
+
+import psycopg2
+
+# config.py lives at the repo root; running this file directly only puts
+# scripts/ on sys.path, so add the root explicitly.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
+from config import CANDIDATES_JSON, DB_CONFIG, setup_logging  # noqa: E402
+
+logger = logging.getLogger(__name__)
+
 
 def migrate_json_to_db() -> None:
-    json_path = "data/candidates.json"
-    
-    if not os.path.exists(json_path):
-        print(f"[ERROR] Source artifact not found at: {json_path}")
+    """
+    Upsert every record in candidates.json, keyed on email.
+
+    Uses ON CONFLICT rather than a check-then-insert so re-running the migration
+    is idempotent and safe against concurrent writers.
+    """
+    if not CANDIDATES_JSON.exists():
+        logger.error("Source file not found at: %s", CANDIDATES_JSON)
         return
 
-    with open(json_path, "r") as f:
-        candidates = json.load(f)
+    with CANDIDATES_JSON.open(encoding="utf-8") as handle:
+        candidates = json.load(handle)
 
-    print(f"[INFO] Initializing migration sequence for {len(candidates)} records.")
+    logger.info("Migrating %d records from %s", len(candidates), CANDIDATES_JSON)
 
+    conn = None
+    cursor = None
     try:
-        # Establish connection matrix
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
 
-        # Construction query utilizing positional parametrization
         insert_query = """
             INSERT INTO candidates (name, raw_title, experience_years, phone, email, skills, source_file)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -52,23 +63,30 @@ def migrate_json_to_db() -> None:
                 record.get("experience_years"),
                 record.get("phone"),
                 record.get("email"),
-                record.get("skills"),  # Psycopg2 maps Python lists to SQL arrays automatically
-                record.get("source_file")
+                record.get("skills"),  # psycopg2 maps Python lists to SQL arrays
+                record.get("source_file"),
             ))
 
         conn.commit()
-        print(f"[SUCCESS] Database state synchronized. {len(candidates)} entities committed.")
+        logger.info("%d records committed.", len(candidates))
 
-    except Exception as e:
-        print(f"[ERROR] Transaction failed: {e}")
-        if 'conn' in locals():
+    except Exception:
+        logger.exception("Transaction failed; rolling back.")
+        if conn is not None:
             conn.rollback()
-            
+
     finally:
-        if 'cursor' in locals():
+        if cursor is not None:
             cursor.close()
-        if 'conn' in locals():
+        if conn is not None:
             conn.close()
 
-if __name__ == "__main__":
+
+def main() -> None:
+    """CLI entry point."""
+    setup_logging()
     migrate_json_to_db()
+
+
+if __name__ == "__main__":
+    main()
