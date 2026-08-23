@@ -50,27 +50,8 @@ against the corpus that batch produced.
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    Browser["Browser / Frontend UI"]
-    API["FastAPI Layer<br/>/upload-resumes, /search, /status"]
-    Redis[("Redis<br/>DB 0: Task Queue | DB 1: Search Cache")]
-    W1["Celery Worker 1"]
-    W2["Celery Worker 2"]
-    Gemini["Gemini API<br/>(extraction)"]
-    DB[("PostgreSQL + pgvector<br/>Candidate records & embeddings")]
-
-    Browser -->|HTTP request| API
-    API -->|dispatch per-file task| Redis
-    Redis -->|deliver task| W1
-    Redis -->|deliver task| W2
-    W1 -->|extract data| Gemini
-    W2 -->|extract data| Gemini
-    W1 -->|write candidate| DB
-    W2 -->|write candidate| DB
-    API -->|query / cache| Redis
-    API -->|search| DB
-```
+![System Architecture](docs/screenshots/systemARC.png)
+Figure 1: System Architecture
 
 ```text
 extraction.py       # sole Gemini-calling module — schema, retry policy, embedding
