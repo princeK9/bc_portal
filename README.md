@@ -50,8 +50,9 @@ against the corpus that batch produced.
 
 ## Architecture
 
-![System Architecture](docs/screenshots/systemARC.png)
-Figure 1: System Architecture
+<p align="center"><img src="docs/screenshots/systemARC.png" width="650" alt="System Architecture diagram"></p>
+
+*Figure 1: System Architecture*
 
 ```text
 extraction.py       # sole Gemini-calling module — schema, retry policy, embedding
